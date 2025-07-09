@@ -1,1 +1,1 @@
-module bmstu-itstech
+module auth
