@@ -1,0 +1,17 @@
+env: "local"
+token_ttl: 1h
+grpc:
+  port: 2025
+  timeout: 7s
+secret: b-string-secret-at-least-256-bits-long
+postgres:
+  postgres_driver_name: pgx
+  postgres_passwd: 123456789
+  postgres_endpoint: localhost
+  postgres_user: 123456789
+  postgres_db_name: postgres
+  postgres_port: 5432
+  postgres_disable: disable
+  postgres_public: public
+  postgres_max_open_conn: 10
+  postgres_conn_idle_time: 10s
