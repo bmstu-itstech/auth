@@ -9,4 +9,5 @@ type User struct {
 	Name       string `db:"name"`
 	Surname    string `db:"surname"`
 	Patronymic string `db:"patronymic"`
+	IsAdmin    bool   `db:"is_admin"`
 }

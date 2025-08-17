@@ -1,6 +1,9 @@
 package errs
 
-import "errors"
+import (
+	"errors"
+	"fmt"
+)
 
 var (
 	ErrUserNotFound           = errors.New("user not found")
@@ -17,4 +20,8 @@ var (
 	ErrCannotChangeName       = errors.New("cannot change name")
 	ErrCannotChangeSurname    = errors.New("cannot change surname")
 	ErrCannotChangePatronymic = errors.New("cannot change patronymic")
+	ErrUserNotAdmin           = errors.New("user not admin")
+	ErrNoUsersFound           = fmt.Errorf("no users found")
+	ErrFailedToChangeUserData = errors.New("failed to change user data")
+	ErrNoFieldsToUpdate       = fmt.Errorf("no fields to update")
 )

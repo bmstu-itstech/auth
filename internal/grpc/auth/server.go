@@ -25,38 +25,57 @@ type Auth interface {
 
 	GetUserData(
 		ctx context.Context,
-		jwt string,
+		jwtString string,
 	) (user models.User, err error)
 
 	ChangeUserPassword(
 		ctx context.Context,
-		login string,
-		password string,
+		jwtString string,
 		newPassword string,
 	) (string, error)
 
 	ChangeUserLogin(
 		ctx context.Context,
-		login string,
-		password string,
+		jwtString string,
 		newLogin string,
 	) (string, error)
 
 	ChangeUserEmail(
 		ctx context.Context,
-		login string,
-		password string,
+		jwtString string,
 		newEmail string,
 	) (string, error)
 
 	ChangeUserNSP(
 		ctx context.Context,
-		login string,
-		password string,
+		jwtString string,
 		newName string,
 		newSurname string,
 		newPatronymic string,
 	) (string, error)
+
+	DeleteUserByAdmin(
+		ctx context.Context,
+		jwtString string,
+		uID uint64,
+	) error
+
+	GetAllUsersByAdmin(
+		ctx context.Context,
+		jwtString string,
+	) (users []models.User, err error)
+
+	GetUserDataByAdmin(
+		ctx context.Context,
+		jwtString string,
+		uID uint64,
+	) (user models.User, err error)
+
+	ChangeUserDataByAdmin(
+		ctx context.Context,
+		jwtString string,
+		newUserData models.User,
+	) error
 }
 
 type serverAPI struct {
@@ -100,7 +119,6 @@ func (s *serverAPI) Register(
 	ctx context.Context,
 	req *authv2.RegisterRequest,
 ) (*authv2.RegisterResponse, error) {
-
 	if req.GetLogin() == "" {
 		return nil, status.Error(codes.InvalidArgument, "login required")
 	}
@@ -192,19 +210,15 @@ func (s *serverAPI) ChangeUserPassword(
 	ctx context.Context,
 	req *authv2.ChangeUserPasswordRequest,
 ) (*authv2.ChangeUserPasswordResponse, error) {
-	if req.GetLogin() == "" {
-		return nil, status.Error(codes.InvalidArgument, "login required")
-	}
-
-	if req.GetPassword() == "" {
-		return nil, status.Error(codes.InvalidArgument, "password required")
+	if req.GetJwtToken() == "" {
+		return nil, status.Error(codes.InvalidArgument, "jwt required")
 	}
 
 	if req.GetNewPassword() == "" {
 		return nil, status.Error(codes.InvalidArgument, "new password required")
 	}
 
-	jwtToken, err := s.auth.ChangeUserPassword(ctx, req.GetLogin(), req.GetPassword(), req.GetNewPassword())
+	jwtToken, err := s.auth.ChangeUserPassword(ctx, req.GetJwtToken(), req.GetNewPassword())
 	if err != nil {
 		if errors.Is(err, errs.ErrInvalidCredentials) {
 			return nil, status.Error(codes.InvalidArgument, "invalid credentials")
@@ -221,19 +235,15 @@ func (s *serverAPI) ChangeUserLogin(
 	ctx context.Context,
 	req *authv2.ChangeUserLoginRequest,
 ) (*authv2.ChangeUserLoginResponse, error) {
-	if req.GetLogin() == "" {
-		return nil, status.Error(codes.InvalidArgument, "login required")
-	}
-
-	if req.GetPassword() == "" {
-		return nil, status.Error(codes.InvalidArgument, "password required")
+	if req.GetJwtToken() == "" {
+		return nil, status.Error(codes.InvalidArgument, "jwt required")
 	}
 
 	if req.GetNewLogin() == "" {
 		return nil, status.Error(codes.InvalidArgument, "new password required")
 	}
 
-	jwtToken, err := s.auth.ChangeUserLogin(ctx, req.GetLogin(), req.GetPassword(), req.GetNewLogin())
+	jwtToken, err := s.auth.ChangeUserLogin(ctx, req.GetJwtToken(), req.GetNewLogin())
 	if err != nil {
 		if errors.Is(err, errs.ErrInvalidCredentials) {
 			return nil, status.Error(codes.InvalidArgument, "invalid credentials")
@@ -250,19 +260,19 @@ func (s *serverAPI) ChangeUserEmail(
 	ctx context.Context,
 	req *authv2.ChangeUserEmailRequest,
 ) (*authv2.ChangeUserEmailResponse, error) {
-	if req.GetLogin() == "" {
-		return nil, status.Error(codes.InvalidArgument, "login required")
-	}
-
-	if req.GetPassword() == "" {
-		return nil, status.Error(codes.InvalidArgument, "password required")
+	if req.GetJwtToken() == "" {
+		return nil, status.Error(codes.InvalidArgument, "jwt required")
 	}
 
 	if req.GetNewEmail() == "" {
 		return nil, status.Error(codes.InvalidArgument, "new password required")
 	}
 
-	jwtToken, err := s.auth.ChangeUserEmail(ctx, req.GetLogin(), req.GetPassword(), req.GetNewEmail())
+	jwtToken, err := s.auth.ChangeUserEmail(
+		ctx,
+		req.GetJwtToken(),
+		req.GetNewEmail(),
+	)
 	if err != nil {
 		if errors.Is(err, errs.ErrInvalidCredentials) {
 			return nil, status.Error(codes.InvalidArgument, "invalid credentials")
@@ -279,12 +289,8 @@ func (s *serverAPI) ChangeNSP(
 	ctx context.Context,
 	req *authv2.ChangeUserNSPRequest,
 ) (*authv2.ChangeUserNSPResponse, error) {
-	if req.GetLogin() == "" {
-		return nil, status.Error(codes.InvalidArgument, "login required")
-	}
-
-	if req.GetPassword() == "" {
-		return nil, status.Error(codes.InvalidArgument, "password required")
+	if req.GetJwtToken() == "" {
+		return nil, status.Error(codes.InvalidArgument, "jwt required")
 	}
 
 	if req.GetNewName() != "" && (len(req.GetNewName()) == 1 || len(req.GetNewName()) >= 26) {
@@ -296,13 +302,12 @@ func (s *serverAPI) ChangeNSP(
 	}
 
 	jwtToken, err := s.auth.ChangeUserNSP(
-		ctx, req.GetLogin(),
-		req.GetPassword(),
+		ctx,
+		req.GetJwtToken(),
 		req.GetNewName(),
 		req.GetNewSurname(),
 		req.GetNewPatronymic(),
 	)
-
 	if err != nil {
 		if errors.Is(err, errs.ErrInvalidCredentials) {
 			return nil, status.Error(codes.InvalidArgument, "invalid credentials")
@@ -315,5 +320,135 @@ func (s *serverAPI) ChangeNSP(
 
 	return &authv2.ChangeUserNSPResponse{
 		JwtToken: jwtToken,
+	}, nil
+}
+
+func (s *serverAPI) DeleteUserByAdmin(
+	ctx context.Context,
+	req *authv2.DeleteUserByAdminRequest,
+) (*authv2.DeleteUserByAdminResponse, error) {
+	if req.GetJwtToken() == "" {
+		return nil, status.Error(codes.InvalidArgument, "jwt required")
+	}
+
+	if req.GetUid() == 0 {
+		return nil, status.Error(codes.InvalidArgument, "uid required")
+	}
+
+	err := s.auth.DeleteUserByAdmin(
+		ctx,
+		req.GetJwtToken(),
+		uint64(req.GetUid()),
+	)
+	if err != nil {
+		return nil, status.Error(codes.Internal, "internal server error")
+	}
+
+	return &authv2.DeleteUserByAdminResponse{
+		OK: true,
+	}, nil
+}
+
+func (s *serverAPI) GetAllUsers(
+	ctx context.Context,
+	req *authv2.GetAllUsersRequest,
+) (*authv2.GetAllUsersResponse, error) {
+	if req.GetJwtToken() == "" {
+		return nil, status.Error(codes.InvalidArgument, "jwt required")
+	}
+
+	users, err := s.auth.GetAllUsersByAdmin(ctx, req.GetJwtToken())
+	if err != nil {
+		if errors.Is(err, errs.ErrUserNotAdmin) {
+			return nil, status.Error(codes.PermissionDenied, "permission denied")
+		}
+		return nil, status.Error(codes.Internal, "internal server error")
+	}
+
+	usersGRPC := make([]*authv2.User, len(users))
+	for i, u := range users {
+		usersGRPC[i] = &authv2.User{
+			Uid:        u.ID,
+			Email:      u.Email,
+			Name:       u.Name,
+			Surname:    u.Surname,
+			Patronymic: u.Patronymic,
+			IsAdmin:    u.IsAdmin,
+		}
+	}
+
+	return &authv2.GetAllUsersResponse{
+		Users: usersGRPC,
+	}, nil
+}
+
+func (s *serverAPI) GetUserDataByAdmin(
+	ctx context.Context,
+	req *authv2.GetUserDataByAdminRequest,
+) (*authv2.GetUserDataByAdminResponse, error) {
+
+	if req.GetJwtToken() == "" {
+		return nil, status.Error(codes.InvalidArgument, "jwt required")
+	}
+
+	if req.GetUid() == 0 {
+		return nil, status.Error(codes.InvalidArgument, "uid required")
+	}
+
+	user, err := s.auth.GetUserDataByAdmin(
+		ctx,
+		req.GetJwtToken(),
+		uint64(req.GetUid()),
+	)
+	if err != nil {
+		if errors.Is(err, errs.ErrUserNotFound) {
+			return nil, status.Error(codes.NotFound, "user not found")
+		}
+		return nil, status.Error(codes.Internal, "internal server error")
+	}
+
+	return &authv2.GetUserDataByAdminResponse{
+		User: &authv2.User{
+			Uid:        user.ID,
+			Email:      user.Email,
+			Name:       user.Name,
+			Surname:    user.Surname,
+			Patronymic: user.Patronymic,
+			IsAdmin:    user.IsAdmin,
+		},
+	}, nil
+}
+
+func (s *serverAPI) ChangeUserDataByAdmin(
+	ctx context.Context,
+	req *authv2.ChangeUserDataByAdminRequest,
+) (*authv2.ChangeUserDataByAdminResponse, error) {
+	if req.GetJwtToken() == "" {
+		return nil, status.Error(codes.InvalidArgument, "jwt required")
+	}
+
+	if req.GetUid() == 0 {
+		return nil, status.Error(codes.InvalidArgument, "uid required")
+	}
+
+	err := s.auth.ChangeUserDataByAdmin(
+		ctx,
+		req.GetJwtToken(),
+		models.User{
+			ID:         req.GetUid(),
+			Email:      req.GetEmail(),
+			Name:       req.GetName(),
+			Surname:    req.GetSurname(),
+			Patronymic: req.GetPatronymic(),
+			Password:   req.GetPassword(),
+			IsAdmin:    req.GetIsAdmin(),
+		},
+	)
+	if err != nil {
+		return nil, status.Error(codes.Internal, "internal server error")
+	}
+
+	return &authv2.ChangeUserDataByAdminResponse{
+		OK: true,
 	}, nil
 }
